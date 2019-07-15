@@ -29,6 +29,14 @@
     <!-- [END welcome] -->
     <!-- [START config] -->
     <context-param>
+        <param-name>projectId</param-name>
+        <param-value>${projectId}</param-value>
+    </context-param>
+    <context-param>
+        <param-name>gcp.topic</param-name>
+        <param-value>${gcp.topic}</param-value>
+    </context-param>
+    <context-param>
         <param-name>bookshelf.storageType</param-name>
         <param-value>${bookshelf.storageType}</param-value>
     </context-param>

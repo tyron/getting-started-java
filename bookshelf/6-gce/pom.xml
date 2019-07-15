@@ -32,7 +32,8 @@ Copyright 2016 Google Inc.
 
   <properties>
     <!-- [START config] -->
-    <projectID>myProjectID</projectID> <!-- set w/ -DprojectID=myProjectID on command line -->
+    <projectId>myProjectID</projectId> <!-- set w/ -Dgcp.projectId=myProjectID on command line -->
+    <!--  <gcp.topic>my-topic</gcp.topic> -->
 
     <bookshelf.storageType>datastore</bookshelf.storageType>   <!-- datastore or cloudsql -->
 
@@ -125,6 +126,16 @@ Copyright 2016 Google Inc.
       <artifactId>google-api-services-plus</artifactId>
       <version>v1-rev20180805-1.27.0</version>
     </dependency>
+    
+    <!-- causes slf4j issues -->
+    <!-- https://mvnrepository.com/artifact/com.google.cloud/google-cloud-pubsub -->
+    <!--  <dependency>
+	    <groupId>com.google.cloud</groupId>
+	    <artifactId>google-cloud-pubsub</artifactId>
+	    <version>[1.82.0, 1.99)</version>
+	</dependency>
+	-->
+	    
 
     <dependency>                        <!-- https://github.com/FasterXML/jackson-databind -->
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -192,6 +203,8 @@ Copyright 2016 Google Inc.
 	    <version>${opencensus.version}</version>
 	</dependency>
 	
+	<!-- 2 dependencies below for Jetty https://opencensus.io/guides/http/java/jetty/server/#stats -->
+	
 	<!-- https://mvnrepository.com/artifact/io.opencensus/opencensus-contrib-http-servlet -->
 	<dependency>
 	    <groupId>io.opencensus</groupId>
@@ -205,6 +218,29 @@ Copyright 2016 Google Inc.
 	    <artifactId>opencensus-contrib-http-util</artifactId>
 	    <version>${opencensus.version}</version>
 	</dependency>
+	
+	
+	<!-- opencensus stackdriver monitoring -->
+    <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-exporter-stats-stackdriver</artifactId>
+        <version>${opencensus.version}</version>
+    </dependency>
+ 
+      <!-- slf4j API frontend binding with JUL backend -->
+      <!-- 
+      <dependency>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+          <version>1.7.7</version>
+      </dependency>
+      <dependency>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-jdk14</artifactId>
+          <version>1.7.7</version>
+      </dependency>
+      -->
+
 
     <!-- Test dependencies -->
     <dependency>

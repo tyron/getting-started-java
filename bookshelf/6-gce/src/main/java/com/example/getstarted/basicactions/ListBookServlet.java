@@ -38,7 +38,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jetty.server.Server;
+
 import io.opencensus.common.Scope;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
 import io.opencensus.exporter.trace.zipkin.ZipkinExporterConfiguration;
 import io.opencensus.exporter.trace.zipkin.ZipkinTraceExporter;
 import io.opencensus.trace.AttributeValue;
@@ -50,6 +54,17 @@ import io.opencensus.trace.config.TraceConfig;
 import io.opencensus.trace.config.TraceParams;
 import io.opencensus.trace.samplers.Samplers;
 
+import io.opencensus.contrib.http.util.HttpViews;
+import io.opencensus.contrib.http.servlet.OcHttpServletFilter;
+
+import io.opencensus.stats.Measure.MeasureDouble;
+import io.opencensus.stats.Measure.MeasureLong;
+import io.opencensus.stats.Stats;
+import io.opencensus.stats.StatsRecorder;
+
+
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ContextHandler;
 
 // [START example]
 // a url pattern of "" makes this servlet the root servlet
@@ -59,25 +74,36 @@ public class ListBookServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(ListBookServlet.class.getName());
   private static final Tracer tracer = Tracing.getTracer();
-  
-  @Override
+  private static final StatsRecorder statsRecorder = Stats.getStatsRecorder();
+
   public void init() throws ServletException {
-	
+	  
 	// 1. Configure exporter to export traces to Zipkin.
-	  ZipkinTraceExporter.createAndRegister(ZipkinExporterConfiguration
-  												.builder()
-  												.setV2Url("http://localhost:9411/api/v2/spans")
-  												.setServiceName("tracing-to-zipkin")
-  												.build());
+	String gcpProjectId = this.getServletContext().getInitParameter("projectId");
+
+	
+	try {
+		StackdriverTraceExporter
+				.createAndRegister(StackdriverTraceConfiguration.builder().setProjectId(gcpProjectId).build());
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		throw new ServletException("Trace exporter error", e);
+	}
+		
+	ZipkinTraceExporter.createAndRegister(ZipkinExporterConfiguration.builder()
+			.setV2Url("http://localhost:9411/api/v2/spans").setServiceName("tracing-to-zipkin").build());
+	
+	
+	HttpViews.registerAllServerViews();
 	
 	// 2. Configure 100% sample rate, otherwise, few traces will be sampled.
 	TraceConfig traceConfig = Tracing.getTraceConfig();
 	TraceParams activeTraceParams = traceConfig.getActiveTraceParams();
 	traceConfig.updateActiveTraceParams(activeTraceParams.toBuilder().setSampler(Samplers.alwaysSample()).build());
-
+	
 	// 3. Get the global singleton Tracer object.
 	// Tracer tracer = Tracing.getTracer();
-
+	
 	// 4. Create a scoped span, a scoped span will automatically end when closed.
 	// It implements AutoClosable, so it'll be closed when the try block ends.
 	/*try (Scope scope = tracer.spanBuilder("main").startScopedSpan()) {
@@ -86,11 +112,12 @@ public class ListBookServlet extends HttpServlet {
 			doWork(i);
 		}
 	}*/
-
+	
 	// 5. Gracefully shutdown the exporter, so that it'll flush queued traces to Zipkin.
 	//Tracing.getExportComponent().shutdown();
 	  
-	BookDao dao = null;
+	
+    BookDao dao = null;
     CloudStorageHelper storageHelper = new CloudStorageHelper();
 
     // Creates the DAO based on the Context Parameters
@@ -123,9 +150,19 @@ public class ListBookServlet extends HttpServlet {
     this.getServletContext().setAttribute(
         "isAuthConfigured",            // Hide login when auth is not configured.
         !Strings.isNullOrEmpty(getServletContext().getInitParameter("bookshelf.clientID")));
+    
+    this.getServletContext().setAttribute(
+    	"projectId",
+    	!Strings.isNullOrEmpty(gcpProjectId));
+    
+    this.getServletContext().setAttribute(
+        	"topic",
+        	!Strings.isNullOrEmpty(getServletContext().getInitParameter("gcp.topic")));
     // [END authConfigured]
   }
 
+  
+  
 @Override
   public void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException,
       ServletException {
@@ -139,7 +176,7 @@ public class ListBookServlet extends HttpServlet {
 	    Span span = tracer.getCurrentSpan();
 	    try {
 	      Result<Book> result = dao.listBooks(startCursor);
-	      logger.log(Level.INFO, "Retrieved list of all books!");
+	      logger.log(Level.INFO, "Retrieved list of all books");
 	      books = result.result;
 	      endCursor = result.cursor;
 	    } catch (Exception e) {
@@ -157,8 +194,10 @@ public class ListBookServlet extends HttpServlet {
 
 	    // 7. Annotate our span to capture metadata about our operation
 	    Map<String, AttributeValue> attributes = new HashMap<String, AttributeValue>();
-	    attributes.put("books", AttributeValue.longAttributeValue(books.size()));
-	    span.addAnnotation("Invoking doGet", attributes);
+	    attributes.put("count", AttributeValue.longAttributeValue(books.size()));
+	    span.addAnnotation("returning from doGet", attributes);
+	    
+	    
 	    
 	    req.getRequestDispatcher("/base.jsp").forward(req, resp);
 	}
