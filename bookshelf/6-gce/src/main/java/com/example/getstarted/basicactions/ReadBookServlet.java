@@ -18,6 +18,12 @@ package com.example.getstarted.basicactions;
 import com.example.getstarted.daos.BookDao;
 import com.example.getstarted.objects.Book;
 
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Status;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,24 +41,31 @@ public class ReadBookServlet extends HttpServlet {
 
   // [START init]
   private final Logger logger = Logger.getLogger(ReadBookServlet.class.getName());
+  private static final Tracer tracer = Tracing.getTracer();
   // [END init]
 
   @Override
   public void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException,
       ServletException {
-    Long id = Long.decode(req.getParameter("id"));
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-    try {
-      Book book = dao.readBook(id);
-      // [START log]
-      logger.log(Level.INFO, "Read book with id {0}", id);
-      // [END log]
-      req.setAttribute("book", book);
-      req.setAttribute("page", "view");
-      req.getRequestDispatcher("/base.jsp").forward(req, resp);
-    } catch (Exception e) {
-      throw new ServletException("Error reading book", e);
-    }
+
+	  try (Scope scope = tracer.spanBuilder("books.read").startScopedSpan()) {
+		Span span = tracer.getCurrentSpan();
+		
+	    Long id = Long.decode(req.getParameter("id"));
+	    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+	    try {
+	      Book book = dao.readBook(id);
+	      // [START log]
+	      logger.log(Level.INFO, "Read book with id {0}", id);
+	      // [END log]
+	      req.setAttribute("book", book);
+	      req.setAttribute("page", "view");
+	      req.getRequestDispatcher("/base.jsp").forward(req, resp);
+	    } catch (Exception e) {
+	      span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+	      throw new ServletException("Error reading book", e);
+	    }
+	  }
   }
 }
 // [END example]

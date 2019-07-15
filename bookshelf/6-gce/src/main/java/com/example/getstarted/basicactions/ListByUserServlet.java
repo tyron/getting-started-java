@@ -20,6 +20,12 @@ import com.example.getstarted.daos.BookDao;
 import com.example.getstarted.objects.Book;
 import com.example.getstarted.objects.Result;
 
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Status;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.logging.Level;
@@ -36,33 +42,38 @@ import javax.servlet.http.HttpServletResponse;
 @WebServlet(name = "listbyuser", value = "/books/mine")
 public class ListByUserServlet extends HttpServlet {
 
-  private static final Logger logger = Logger.getLogger(ListByUserServlet.class.getName());
+	private static final Logger logger = Logger.getLogger(ListByUserServlet.class.getName());
+	private static final Tracer tracer = Tracing.getTracer();
 
-  @Override
-  public void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException,
-        ServletException {
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-    String startCursor = req.getParameter("cursor");
-    List<Book> books = null;
-    String endCursor = null;
-    try {
-      Result<Book> result =
-          dao.listBooksByUser((String) req.getSession().getAttribute("userId"), startCursor);
-      books = result.result;
-      endCursor = result.cursor;
-    } catch (Exception e) {
-      throw new ServletException("Error listing books", e);
-    }
-    req.getSession().getServletContext().setAttribute("books", books);
-    StringBuilder bookNames = new StringBuilder();
-    for (Book book : books) {
-      bookNames.append(book.getTitle() + " ");
-    }
-    logger.log(Level.INFO, "Loaded books: " + bookNames.toString()
-        + " for user " + (String) req.getSession().getAttribute("userId"));
-    req.getSession().setAttribute("cursor", endCursor);
-    req.getSession().setAttribute("page", "list");
-    req.getRequestDispatcher("/base.jsp").forward(req, resp);
-  }
+	@Override
+	public void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+		try (Scope scope = tracer.spanBuilder("books.listByUser").startScopedSpan()) {
+			Span span = tracer.getCurrentSpan();
+			
+			BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+			String startCursor = req.getParameter("cursor");
+			List<Book> books = null;
+			String endCursor = null;
+			try {
+				Result<Book> result = dao.listBooksByUser((String) req.getSession().getAttribute("userId"),
+						startCursor);
+				books = result.result;
+				endCursor = result.cursor;
+			} catch (Exception e) {
+				span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+				throw new ServletException("Error listing books", e);
+			}
+			req.getSession().getServletContext().setAttribute("books", books);
+			StringBuilder bookNames = new StringBuilder();
+			for (Book book : books) {
+				bookNames.append(book.getTitle() + " ");
+			}
+			logger.log(Level.INFO, "Loaded books: " + bookNames.toString() + " for user "
+					+ (String) req.getSession().getAttribute("userId"));
+			req.getSession().setAttribute("cursor", endCursor);
+			req.getSession().setAttribute("page", "list");
+			req.getRequestDispatcher("/base.jsp").forward(req, resp);
+		}
+	}
 }
 // [END example]

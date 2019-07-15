@@ -8,6 +8,9 @@
 *.iml
 .idea/
 
+# VS Code
+.vscode
+
 # Target folders
 target/
 build/

@@ -17,6 +17,12 @@ package com.example.getstarted.basicactions;
 
 import com.example.getstarted.daos.BookDao;
 
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Status;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+
 import java.io.IOException;
 
 import javax.servlet.ServletException;
@@ -29,18 +35,23 @@ import javax.servlet.http.HttpServletResponse;
 @SuppressWarnings("serial")
 @WebServlet(name = "delete", value = "/delete")
 public class DeleteBookServlet extends HttpServlet {
-
-  @Override
-  public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException,
-      IOException {
-    Long id = Long.decode(req.getParameter("id"));
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-    try {
-      dao.deleteBook(id);
-      resp.sendRedirect("/books");
-    } catch (Exception e) {
-      throw new ServletException("Error deleting book", e);
-    }
-  }
+	
+	private static final Tracer tracer = Tracing.getTracer();
+	
+	@Override
+	public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		try (Scope scope = tracer.spanBuilder("books.delete").startScopedSpan()) {
+			Span span = tracer.getCurrentSpan();
+			Long id = Long.decode(req.getParameter("id"));
+			BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+			try {
+				dao.deleteBook(id);
+				resp.sendRedirect("/books");
+			} catch (Exception e) {
+				span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+				throw new ServletException("Error deleting book", e);
+			}
+		}
+	}
 }
 // [END example]

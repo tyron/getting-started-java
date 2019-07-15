@@ -19,6 +19,12 @@ import com.example.getstarted.daos.BookDao;
 import com.example.getstarted.objects.Book;
 import com.example.getstarted.util.CloudStorageHelper;
 
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Status;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+
 import java.io.IOException;
 
 import javax.servlet.ServletException;
@@ -34,52 +40,56 @@ import javax.servlet.http.HttpServletResponse;
 @WebServlet(name = "update", value = "/update")
 public class UpdateBookServlet extends HttpServlet {
 
-  @Override
-  public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException,
-      IOException {
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-    try {
-      Book book = dao.readBook(Long.decode(req.getParameter("id")));
-      req.setAttribute("book", book);
-      req.setAttribute("action", "Edit");
-      req.setAttribute("destination", "update");
-      req.setAttribute("page", "form");
-      req.getRequestDispatcher("/base.jsp").forward(req, resp);
-    } catch (Exception e) {
-      throw new ServletException("Error loading book for editing", e);
-    }
-  }
+	private static final Tracer tracer = Tracing.getTracer();
 
-  @Override
-  public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException,
-      IOException {
-    CloudStorageHelper storageHelper =
-        (CloudStorageHelper) req.getServletContext().getAttribute("storageHelper");
-    String imageUrl =
-        storageHelper.getImageUrl(
-            req, resp, getServletContext().getInitParameter("bookshelf.bucket"));
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-    try {
+	@Override
+	public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		try (Scope scope = tracer.spanBuilder("books.updateGet").startScopedSpan()) {
+			Span span = tracer.getCurrentSpan();
 
-      Book oldBook = dao.readBook(Long.decode(req.getParameter("id")));
+			BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+			try {
+				Book book = dao.readBook(Long.decode(req.getParameter("id")));
+				req.setAttribute("book", book);
+				req.setAttribute("action", "Edit");
+				req.setAttribute("destination", "update");
+				req.setAttribute("page", "form");
+				req.getRequestDispatcher("/base.jsp").forward(req, resp);
+			} catch (Exception e) {
+				span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+				throw new ServletException("Error loading book for editing", e);
+			}
+		}
+	}
 
-      Book book = new Book.Builder()
-          .author(req.getParameter("author"))
+	@Override
+	public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		try (Scope scope = tracer.spanBuilder("books.updatePost").startScopedSpan()) {
+			Span span = tracer.getCurrentSpan();
 
-          .createdBy(oldBook.getCreatedBy())
-          .createdById(oldBook.getCreatedById())
+			CloudStorageHelper storageHelper = (CloudStorageHelper) req.getServletContext()
+					.getAttribute("storageHelper");
+			String imageUrl = storageHelper.getImageUrl(req, resp,
+					getServletContext().getInitParameter("bookshelf.bucket"));
+			BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+			try {
 
-          .description(req.getParameter("description"))
-          .id(Long.decode(req.getParameter("id")))
-          .publishedDate(req.getParameter("publishedDate"))
-          .title(req.getParameter("title"))
-          .imageUrl(imageUrl)
-          .build();
-      dao.updateBook(book);
-      resp.sendRedirect("/read?id=" + req.getParameter("id"));
-    } catch (Exception e) {
-      throw new ServletException("Error updating book", e);
-    }
-  }
+				Book oldBook = dao.readBook(Long.decode(req.getParameter("id")));
+
+				Book book = new Book.Builder().author(req.getParameter("author"))
+
+						.createdBy(oldBook.getCreatedBy()).createdById(oldBook.getCreatedById())
+
+						.description(req.getParameter("description")).id(Long.decode(req.getParameter("id")))
+						.publishedDate(req.getParameter("publishedDate")).title(req.getParameter("title"))
+						.imageUrl(imageUrl).build();
+				dao.updateBook(book);
+				resp.sendRedirect("/read?id=" + req.getParameter("id"));
+			} catch (Exception e) {
+				span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+				throw new ServletException("Error updating book", e);
+			}
+		}
+	}
 }
 // [END example]

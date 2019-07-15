@@ -19,6 +19,12 @@ import com.example.getstarted.daos.BookDao;
 import com.example.getstarted.objects.Book;
 import com.example.getstarted.util.CloudStorageHelper;
 
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Status;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,6 +45,7 @@ import javax.servlet.http.HttpServletResponse;
 public class CreateBookServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(CreateBookServlet.class.getName());
+  private static final Tracer tracer = Tracing.getTracer();
 
   // [START setup]
   @Override
@@ -55,39 +62,43 @@ public class CreateBookServlet extends HttpServlet {
   @Override
   public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException,
       IOException {
-    CloudStorageHelper storageHelper =
-        (CloudStorageHelper) req.getServletContext().getAttribute("storageHelper");
-    String imageUrl =
-        storageHelper.getImageUrl(
-            req, resp, getServletContext().getInitParameter("bookshelf.bucket"));
-
-    String createdByString = "";
-    String createdByIdString = "";
-    if (req.getSession().getAttribute("token") != null) { // Does the user have a logged in session?
-      createdByString = (String) req.getSession().getAttribute("userEmail");
-      createdByIdString = (String) req.getSession().getAttribute("userId");
-    }
-
-    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
-
-    Book book = new Book.Builder()
-        .author(req.getParameter("author"))   // form parameter
-
-        .createdBy(createdByString)
-        .createdById(createdByIdString)
-
-        .description(req.getParameter("description"))
-        .publishedDate(req.getParameter("publishedDate"))
-        .title(req.getParameter("title"))
-        .imageUrl(imageUrl)
-        .build();
-    try {
-      Long id = dao.createBook(book);
-      logger.log(Level.INFO, "Created book {0}", book);
-      resp.sendRedirect("/read?id=" + id.toString());   // read what we just wrote
-    } catch (Exception e) {
-      throw new ServletException("Error creating book", e);
-    }
+    try (Scope scope = tracer.spanBuilder("books.create").startScopedSpan()) {
+    	Span span = tracer.getCurrentSpan();
+	    CloudStorageHelper storageHelper =
+	        (CloudStorageHelper) req.getServletContext().getAttribute("storageHelper");
+	    String imageUrl =
+	        storageHelper.getImageUrl(
+	            req, resp, getServletContext().getInitParameter("bookshelf.bucket"));
+	
+	    String createdByString = "";
+	    String createdByIdString = "";
+	    if (req.getSession().getAttribute("token") != null) { // Does the user have a logged in session?
+	      createdByString = (String) req.getSession().getAttribute("userEmail");
+	      createdByIdString = (String) req.getSession().getAttribute("userId");
+	    }
+	
+	    BookDao dao = (BookDao) this.getServletContext().getAttribute("dao");
+	
+	    Book book = new Book.Builder()
+	        .author(req.getParameter("author"))   // form parameter
+	
+	        .createdBy(createdByString)
+	        .createdById(createdByIdString)
+	
+	        .description(req.getParameter("description"))
+	        .publishedDate(req.getParameter("publishedDate"))
+	        .title(req.getParameter("title"))
+	        .imageUrl(imageUrl)
+	        .build();
+	    try {
+	      Long id = dao.createBook(book);
+	      logger.log(Level.INFO, "Created book {0}", book);
+	      resp.sendRedirect("/read?id=" + id.toString());   // read what we just wrote
+	    } catch (Exception e) {
+	      span.setStatus(Status.INTERNAL.withDescription(e.toString()));
+	      throw new ServletException("Error creating book", e);
+	    }
+	  }
   }
   // [END formpost]
 }

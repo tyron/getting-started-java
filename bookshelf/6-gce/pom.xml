@@ -62,6 +62,7 @@ Copyright 2016 Google Inc.
     <maven.compiler.showWarnings>true</maven.compiler.showWarnings>
     <maven.compiler.failOnWarning>true</maven.compiler.failOnWarning>
     <maven.war.filteringDeploymentDescriptors>true</maven.war.filteringDeploymentDescriptors>
+    <opencensus.version>0.23.0</opencensus.version>
   </properties>
 
   <profiles>
@@ -166,6 +167,44 @@ Copyright 2016 Google Inc.
       <artifactId>firebase-admin</artifactId>
       <version>6.6.0</version>
     </dependency>
+    
+    <dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-api</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
+	
+	<dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-impl</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
+	
+	<dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-exporter-trace-zipkin</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
+	
+	<dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-exporter-trace-stackdriver</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
+	
+	<!-- https://mvnrepository.com/artifact/io.opencensus/opencensus-contrib-http-servlet -->
+	<dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-contrib-http-servlet</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
+	
+	<!-- https://mvnrepository.com/artifact/io.opencensus/opencensus-contrib-http-util -->
+	<dependency>
+	    <groupId>io.opencensus</groupId>
+	    <artifactId>opencensus-contrib-http-util</artifactId>
+	    <version>${opencensus.version}</version>
+	</dependency>
 
     <!-- Test dependencies -->
     <dependency>
